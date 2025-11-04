@@ -113,11 +113,6 @@ void reset_terminal() {
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
 
-void handle_sigint(int sig) {
-    reset_terminal();
-    _exit(0);
-}
-
 void configure_terminal() {
     tcgetattr(STDIN_FILENO, &oldt);
     newt = oldt;
@@ -133,16 +128,26 @@ void cleanup_state(GameState *state) {
     free(state->old_screen);
 }
 
+GameState *global_state;
+
+void handle_sigint(int sig) {
+    if (global_state) cleanup_state(global_state);
+    reset_terminal();
+    _exit(0);
+}
+
 int main() {
     srand(time(NULL));
-    signal(SIGINT, handle_sigint);
     configure_terminal();
 
     GameState game_state;
+    global_state = &game_state;
+
     Bird bird;
     initialize_screen(&game_state);
     initialize_bird(&bird, &game_state);
 
+    signal(SIGINT, handle_sigint);
     while (1) {
         clear_state_screen(&game_state);
         update_screen(&game_state, &bird);
