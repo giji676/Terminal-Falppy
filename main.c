@@ -11,6 +11,23 @@
 
 struct termios oldt, newt;
 
+typedef struct {
+    int width;
+    int height;
+    struct *bird;
+} GameState;
+
+typedef struct {
+    int width;
+    int height;
+} Bird;
+
+const char *bird[] = {
+    "\e[0;33m /==\e[0;37m@\e[0;33m\\\e[0m\0",
+    "\e[0;33m<===\e[0;37m@@\e[0;33m=\e[0;31m=>\e[0m\0",
+    "\e[0;33m \\===/\e[0m\0"
+};
+
 double get_time_seconds() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -30,20 +47,6 @@ void draw_death_box(struct winsize w, double t) {
     int box_h = 7;
     int start_row = (w.ws_row - box_h) / 2;
     int start_col = (w.ws_col - box_w) / 2;
-
-    // Pulsing color (brightness changes over time)
-    // int intensity = (int)(fabs(sin(t * 2)) * 3) + 1; // 1–4
-    // int color = 41 + intensity; // 41–45 are red–magenta shades
-    //
-    // for (int r = 0; r < box_h; r++) {
-    //     printf("\e[%d;%dH", start_row + r, start_col);
-    //     for (int c = 0; c < box_w; c++) {
-    //         if (r == 0 || r == box_h - 1 || c == 0 || c == box_w - 1)
-    //             printf("\e[%dm \e[0m", color);
-    //         else
-    //             printf(" ");
-    //     }
-    // }
 
     const char *msg1 = "!!  YOU DIED  !!";
     const char *msg2 = "Press Q to Quit";
