@@ -206,20 +206,23 @@ int check_death(Bird *bird) {
 void death_screen() {
     const char *msg0 = "!! YOU  DIED !!";
     const char *msg1 = "Press Q to Quit";
+    const char *msg2 = "Or R to Restart";
 
     int len0 = strlen(msg0);
     int len1 = strlen(msg1);
+    int len2 = strlen(msg2);
 
     // Center on screen
-    int y0 = height / 2;
-    int y1 = y0 + 1;
+    int y = height / 2 - 1;
     int x0 = width / 2 - len0 / 2;
     int x1 = width / 2 - len1 / 2;
+    int x2 = width / 2 - len2 / 2;
 
     // Clear screen & print centered text
     printf("\e[2J");
-    printf("\e[%d;%dH%s", y0, x0, msg0);
-    printf("\e[%d;%dH%s", y1, x1, msg1);
+    printf("\e[%d;%dH%s", y, x0, msg0);
+    printf("\e[%d;%dH%s", y + 1, x1, msg1);
+    printf("\e[%d;%dH%s", y + 2, x2, msg2);
     fflush(stdout);
 }
 
@@ -285,7 +288,7 @@ int main() {
 
             render(&bird, pipes);
             is_dead = check_death(&bird);
-            is_dead = check_collision(&bird, pipes);
+            is_dead = is_dead || check_collision(&bird, pipes);
             usleep(10000);
         } else {
             death_screen();
@@ -297,6 +300,17 @@ int main() {
                     case 'q':
                     case 'Q':
                         running = 0;
+                        break;
+                    case 'r':
+                    case 'R':
+                        pipes_gap = 80;
+                        pipes_speed = 40;
+                        initialize_pipes(pipes, pipes_gap);
+                        initialize_bird(&bird);
+                        v = 0.0;
+                        g = 20;
+                        jump_f = -12;
+                        is_dead = 0;
                         break;
                 }
             }
