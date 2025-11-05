@@ -178,6 +178,24 @@ void update_pipes(Pipe *pipes, double speed, double gap, double dt) {
     }
 }
 
+int check_collision(Bird *bird, Pipe *pipes) {
+    for (int i = 0; i < MAX_PIPES; i++) {
+        if (pipes[i].x > bird->x + bird->width) {
+            continue;
+        }
+        if (pipes[i].x + PIPES_WIDTH < bird->x) {
+            continue;
+        }
+        if (bird->y < pipes[i].t_h) {
+            return 1;
+        }
+        if (bird->y + bird->height > pipes[i].b_y) {
+            return 1;
+        }
+    }
+    return 0;
+}
+
 int check_death(Bird *bird) {
     if (bird->y - bird->height > height || bird->y < 1) {
         return 1;
@@ -267,6 +285,7 @@ int main() {
 
             render(&bird, pipes);
             is_dead = check_death(&bird);
+            is_dead = check_collision(&bird, pipes);
             usleep(10000);
         } else {
             death_screen();
