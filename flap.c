@@ -3,11 +3,12 @@
 #include <unistd.h>
 #include <signal.h>
 #include <stdlib.h>
+#include <string.h>
 #include <stdio.h>
 #include <time.h>
 #include <math.h>
 
-#define MAX_PIPES 10
+#define MAX_PIPES 5 
 #define PIPES_WIDTH 10
 #define PIPES_MIN_V_GAP 10 // Vertical gap
 #define PIPES_MAX_V_GAP 15 // Vertical gap
@@ -17,7 +18,8 @@ int width, height;
 
 typedef struct {
     int width, height;
-    int x, y;
+    int x;
+    double y;
     const char **lines;
 } Bird;
 
@@ -33,20 +35,28 @@ const char *bird_lines[] = {
     "\e[0;33m \\===/\e[0m\0"
 };
 
+int kbhit() {
+    struct timeval tv = {0L, 0L};
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+    return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
+}
+
+
 void render(Bird *bird, Pipe pipes[]) {
     printf("\e[2J\e[H"); // clear terminal
 
     for (int i = 0; i < MAX_PIPES; i++) {
         for (int row = 0; row < pipes[i].t_h; row++) {
             for (int sx = 0; sx < PIPES_WIDTH; sx++) {
-                int col = (int)round(pipes[i].x) + sx;       // 0-based col
+                int col = (int)round(pipes[i].x) + sx;
                 if (col >= 0 && col < width && row >= 0 && row < height) {
-                    printf("\e[%d;%dH#", row + 1, col + 1);
+                    printf("\e[%d;%dH\e[32m#", row + 1, col + 1);
                 }
             }
         }
 
-        /* bottom pipe rows: rows b_y .. height-1 */
         for (int row = pipes[i].b_y; row < height; row++) {
             for (int sx = 0; sx < PIPES_WIDTH; sx++) {
                 int col = (int)round(pipes[i].x) + sx;
@@ -101,8 +111,8 @@ void initialize_bird(Bird *bird) {
                 while (*p && *p != 'm') p++;
                 if (*p) p++;
             } else if (*p == '\\' && *(p+1) == '\\') { // escaped backslash
-                len++;   // counts as 1 visible char
-                p += 2;  // skip both chars in string
+                len++; // counts as 1 visible char
+                p += 2; // skip both chars in string
             } else {
                 len++;
                 p++;
@@ -168,6 +178,33 @@ void update_pipes(Pipe *pipes, double speed, double gap, double dt) {
     }
 }
 
+int check_death(Bird *bird) {
+    if (bird->y - bird->height > height || bird->y < 1) {
+        return 1;
+    }
+    return 0;
+}
+
+void death_screen() {
+    const char *msg0 = "!! YOU  DIED !!";
+    const char *msg1 = "Press Q to Quit";
+
+    int len0 = strlen(msg0);
+    int len1 = strlen(msg1);
+
+    // Center on screen
+    int y0 = height / 2;
+    int y1 = y0 + 1;
+    int x0 = width / 2 - len0 / 2;
+    int x1 = width / 2 - len1 / 2;
+
+    // Clear screen & print centered text
+    printf("\e[2J");
+    printf("\e[%d;%dH%s", y0, x0, msg0);
+    printf("\e[%d;%dH%s", y1, x1, msg1);
+    fflush(stdout);
+}
+
 int main() {
     srand(time(NULL));
     configure_terminal();
@@ -179,7 +216,7 @@ int main() {
     Bird bird;
     initialize_bird(&bird);
 
-    int pipes_gap = 100;
+    int pipes_gap = 80;
     double pipes_speed = 40;
 
     Pipe pipes[MAX_PIPES];
@@ -188,16 +225,64 @@ int main() {
     signal(SIGINT, handle_sigint);
     double prev_time = get_time_seconds();
 
-    while (1) {
-        // Get delta-time
-        double now = get_time_seconds();
-        double dt = now - prev_time;
-        prev_time = now;
+    char c;
 
-        update_pipes(pipes, pipes_speed, pipes_gap, dt);
+    double v = 0.0;
+    double g = 20;
+    double jump_f = -12;
 
-        render(&bird, pipes);
-        usleep(10000);
+    int running = 1;
+    int paused = 0;
+    int is_dead = 0;
+    while (running) {
+        if (!is_dead) {
+            // Get delta-time
+            double now = get_time_seconds();
+            double dt = now - prev_time;
+            prev_time = now;
+
+            if (kbhit()) {
+                read(STDIN_FILENO, &c, 1);
+                switch (c) {
+                    case 'q':
+                    case 'Q':
+                        running = 0;
+                        break;
+                    case 'p':
+                    case 'P':
+                        paused = paused ? 0 : 1;
+                        break;
+                    case ' ':
+                        v = jump_f;
+                        break;
+                }
+            }
+
+            if (!paused) {
+                v += g * dt;
+                bird.y += v * dt;
+                pipes_speed += dt * 0.9;
+                update_pipes(pipes, pipes_speed, pipes_gap, dt);
+            }
+
+            render(&bird, pipes);
+            is_dead = check_death(&bird);
+            usleep(10000);
+        } else {
+            death_screen();
+            if (kbhit()) {
+                read(STDIN_FILENO, &c, 1);
+                if (c == 'q' || c == 'Q') running = 0;
+
+                switch (c) {
+                    case 'q':
+                    case 'Q':
+                        running = 0;
+                        break;
+                }
+            }
+            usleep(10000);
+        }
     }
 
     return 0;
