@@ -43,7 +43,6 @@ int kbhit() {
     return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
 }
 
-
 void render(Bird *bird, Pipe pipes[]) {
     printf("\e[2J\e[H"); // clear terminal
 
