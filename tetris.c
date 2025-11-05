@@ -46,11 +46,6 @@ void configure_terminal() {
     atexit(reset_terminal);
 }
 
-void handle_sigint(int sig) {
-    reset_terminal();
-    _exit(0);
-}
-
 double get_time_seconds() {
     struct timespec ts;
     clock_gettime(CLOCK_MONOTONIC, &ts);
@@ -196,6 +191,20 @@ void update_state(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
     }
 }
 
+Shape *shapes[NUM_SHAPES];
+
+void free_shapes() {
+    for (int i = 0; i < NUM_SHAPES; i++) {
+        free(shapes[i]);
+    }
+}
+
+void handle_sigint(int sig) {
+    free_shapes();
+    reset_terminal();
+    _exit(0);
+}
+
 int main() {
     srand(time(NULL));
     configure_terminal();
@@ -204,7 +213,6 @@ int main() {
     width = w.ws_col;
     height = w.ws_row;
 
-    Shape *shapes[NUM_SHAPES];
     initialize_shapes(shapes);
 
     int board[BOARD_HEIGHT][BOARD_WIDTH] = {0};
