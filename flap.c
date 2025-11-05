@@ -287,8 +287,7 @@ int main() {
             }
 
             render(&bird, pipes);
-            is_dead = check_death(&bird);
-            is_dead = is_dead || check_collision(&bird, pipes);
+            is_dead = check_death(&bird) || check_collision(&bird, pipes);
             usleep(10000);
         } else {
             death_screen();
