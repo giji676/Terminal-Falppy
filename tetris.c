@@ -67,19 +67,31 @@ int shape_t[2*3] = {
     0,1,0
 };
 
+int shape_l[3*2] = {
+    1,0,
+    1,0,
+    1,1,
+};
+
+int shape_j[3*2] = {
+    0,1,
+    0,1,
+    1,1,
+};
+
 int shape_o[2*2] = {
     1,1,
     1,1
 };
 
-int shape_l[4*1] = {
+int shape_i[4*1] = {
     1,
     1,
     1,
     1
 };
 
-#define NUM_SHAPES 5
+#define NUM_SHAPES 7
 
 typedef struct {
     int width, height;
@@ -108,15 +120,24 @@ void initialize_shapes(Shape *shapes[]) {
     shapes[3]->height = 2;
 
     shapes[4] = malloc(sizeof(Shape));
-    shapes[4]->shape = shape_l;
+    shapes[4]->shape = shape_i;
     shapes[4]->width = 1;
     shapes[4]->height = 4;
+
+    shapes[5] = malloc(sizeof(Shape));
+    shapes[5]->shape = shape_j;
+    shapes[5]->width = 2;
+    shapes[5]->height = 3;
+
+    shapes[6] = malloc(sizeof(Shape));
+    shapes[6]->shape = shape_l;
+    shapes[6]->width = 2;
+    shapes[6]->height = 3;
 }
 
 typedef struct {
     Shape *type;
     int x, y;
-    int rotation;
 } ActivePiece;
 
 ActivePiece spawn_piece(Shape *shapes[]) {
@@ -168,24 +189,16 @@ void render(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
             }
         }
     }
-}
 
-void update_state(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
     Shape *shape = piece->type;
-    if (piece->y + shape->height < BOARD_HEIGHT) {
-        // Clear old shape pposition on board
-        for (int y = 0; y < shape->height; y++) {
-            for (int x = 0; x < shape->width; x++) {
-                if (shape->shape[y * shape->width + x]) {
-                    board[piece->y + y][piece->x + x] = 0;
-                }
-            }
-        }
-        piece->y++;
-        // Draw new shape pposition on board
-        for (int y = 0; y < shape->height; y++) {
-            for (int x = 0; x < shape->width; x++) {
-                board[piece->y + y][piece->x + x] = shape->shape[y * shape->width + x];
+
+    for (int y = 0; y < shape->height; y++) {
+        for (int x = 0; x < shape->width; x++) {
+            if (shape->shape[y * shape->width + x]) {
+                printf("\e[%d;%dH\e[32m%s",
+                       (piece->y + 1 + y) * BLOCK_MULT_Y + y_offset,
+                       (piece->x + 1 + x) * BLOCK_MULT_X + x_offset,
+                       "[]");
             }
         }
     }
@@ -205,6 +218,148 @@ void handle_sigint(int sig) {
     _exit(0);
 }
 
+int check_fall(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
+    Shape *shape = piece->type;
+
+    for (int y = 0; y < shape->height; y++) {
+        for (int x = 0; x < shape->width; x++) {
+            if (piece->y + y == BOARD_HEIGHT - 1) {
+                return 0;
+            }
+            if (!shape->shape[y * shape->width + x]) {
+                continue;
+            }
+            if (board[piece->y + y + 1][piece->x + x]) {
+                return 0;
+            }
+        }
+    }
+    return 1;
+}
+
+void hard_drop(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
+    while (check_fall(board, piece)) {
+        piece->y++;
+    }
+}
+
+void try_move(int dir, int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
+    Shape *shape = piece->type;
+
+    for (int y = 0; y < shape->height; y++) {
+        for (int x = 0; x < shape->width; x++) {
+            if (dir == 1) {
+                if (piece->x + x == BOARD_WIDTH - 1) {
+                    return;
+                }
+            } else {
+                if (piece->x == 0) {
+                    return;
+                }
+            }
+            if (!shape->shape[y * shape->width + x]) {
+                continue;
+            }
+            if (board[piece->y + y][piece->x + x + dir]) {
+                return;
+            }
+        }
+    }
+    piece->x += dir;
+}
+
+
+void update_state(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
+    Shape *shape = piece->type;
+    for (int y = 0; y < shape->height; y++) {
+        for (int x = 0; x < shape->width; x++) {
+            if (shape->shape[y * shape->width + x]) {
+                board[piece->y+y][piece->x+x] = 1;
+            }
+        }
+    }
+}
+
+void debug(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
+    for (int i = 0; i < BOARD_HEIGHT; i++) {
+        for (int j = 0; j < BOARD_WIDTH; j++) {
+            printf("\e[%d;%dH%i", i, j, board[i][j]);
+        }
+    }
+    Shape *shape = piece->type;
+    for (int y = 0; y < shape->height; y++) {
+        for (int x = 0; x < shape->width; x++) {
+            int val = shape->shape[y * shape->width + x] * 2;
+            if (val != 0) {
+                printf("\e[%d;%dH%i",
+                       piece->y + y,
+                       piece->x + x,
+                       val);
+            }
+        }
+    }
+    printf("\e[%d;%dH(%i,%i)", BOARD_HEIGHT+1, 1, piece->y, piece->x);
+}
+
+void check_clear(int board[BOARD_HEIGHT][BOARD_WIDTH]) {
+    for (int i = 0; i < BOARD_HEIGHT; i++) {
+        int full = 1;
+        for (int j = 0; j < BOARD_WIDTH; j++) {
+            if (!board[i][j]) {
+                full = 0;
+                break;
+            }
+        }
+        if (full) {
+            for (int k = i; k > 0; k--) {
+                for (int j = 0; j < BOARD_WIDTH; j++) {
+                    board[k][j] = board[k - 1][j];
+                }
+            }
+            for (int j = 0; j < BOARD_WIDTH; j++) {
+                board[0][j] = 0;
+            }
+            i--;
+        }
+    }
+}
+
+void rotate_shape(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
+    Shape *shape = piece->type;
+    int new_w = shape->height;
+    int new_h = shape->width;
+
+    int rotated[new_h * new_w];
+
+    for (int y = 0; y < shape->height; y++) {
+        for (int x = 0; x < shape->width; x++) {
+            rotated[x * new_w + (new_w - 1 - y)] = shape->shape[y * shape->width + x];
+        }
+    }
+
+    for (int y = 0; y < new_h; y++) {
+        for (int x = 0; x < new_w; x++) {
+            if (!rotated[y * new_w + x])
+                continue;
+
+            int new_x = piece->x + x;
+            int new_y = piece->y + y;
+
+            if (new_x < 0 || new_x >= BOARD_WIDTH || new_y < 0 || new_y >= BOARD_HEIGHT)
+                return;
+
+            if (board[new_y][new_x])
+                return;
+        }
+    }
+
+    for (int i = 0; i < shape->width * shape->height; i++)
+        shape->shape[i] = rotated[i];
+
+    shape->width = new_w;
+    shape->height = new_h;
+}
+
 int main() {
     srand(time(NULL));
     configure_terminal();
@@ -217,20 +372,92 @@ int main() {
 
     int board[BOARD_HEIGHT][BOARD_WIDTH] = {0};
     ActivePiece piece = spawn_piece(shapes);
+    Shape hold_shape;
 
     signal(SIGINT, handle_sigint);
     double prev_time = get_time_seconds();
 
-    char c;
-
     int running = 1;
     while (running) {
-        double now = get_time_seconds();
-        if (now - prev_time > 0.5) {
-            prev_time = now;
-            update_state(board, &piece);
+        printf("\e[2J\e[H"); // clear terminal
+        if (kbhit()) {
+            char seq[3];
+            read(STDIN_FILENO, &seq[0], 1);
+            if (seq[0] == '\e') { // Escape sequence
+                // Check if the next two bytes exist
+                if (read(STDIN_FILENO, &seq[1], 1) > 0 && seq[1] == '[') {
+                    if (read(STDIN_FILENO, &seq[2], 1) > 0) {
+                        switch (seq[2]) {
+                            case 'A': // Up: rotate
+                                rotate_shape(board, &piece);
+                                break;
+                            case 'B': // Down
+                                if (check_fall(board, &piece)) {
+                                    piece.y++;
+                                } else {
+                                    update_state(board, &piece);
+                                    piece = spawn_piece(shapes);
+                                }
+                                break;
+                            case 'C': // Right
+                                try_move(1, board, &piece);
+                                break;
+                            case 'D': // Left
+                                try_move(-1, board, &piece);
+                                break;
+                        }
+                    }
+                }
+            } else {
+                switch (seq[0]) {
+                    case 'q':
+                        running = 0;
+                        break;
+                    case 'w':
+                    case 'k': // Rotate
+                        rotate_shape(board, &piece);
+                        break;
+                    case 'l': // Right
+                        try_move(1, board, &piece);
+                        break;
+                    case 'h': // Left
+                        try_move(-1, board, &piece);
+                        break;
+                    case 'j': // Down
+                        if (check_fall(board, &piece)) {
+                            piece.y++;
+                        } else {
+                            update_state(board, &piece);
+                            piece = spawn_piece(shapes);
+                        }
+                        break;
+                    case ' ': // Full down
+                        hard_drop(board, &piece);
+                        update_state(board, &piece);
+                        piece = spawn_piece(shapes);
+                        break;
+                    case 'c': // Hold
+                        // hold(&piece, &hold_shape);
+                        break;
+                }
+            }
         }
+        double now = get_time_seconds();
+        if (now - prev_time > 0.3) {
+            prev_time = now;
+
+            if (check_fall(board, &piece)) {
+                piece.y++;
+            }
+            else {
+                update_state(board, &piece);
+                piece = spawn_piece(shapes);
+            }
+            check_clear(board);
+        }
+        debug(board, &piece);
         render(board, &piece);
+        fflush(stdout);
         usleep(100000);
     }
 }
