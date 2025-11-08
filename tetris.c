@@ -140,11 +140,12 @@ typedef struct {
     int x, y;
 } ActivePiece;
 
-ActivePiece spawn_piece(Shape *shapes[]) {
+ActivePiece spawn_piece(Shape *shapes[], int *hold_used) {
     ActivePiece p;
     p.type = shapes[rand() % NUM_SHAPES];
     p.x = BOARD_WIDTH / 2 - p.type->width / 2;
     p.y = 0;
+    *hold_used = 0;
     return p;
 }
 
@@ -360,6 +361,44 @@ void rotate_shape(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
     shape->height = new_h;
 }
 
+void hold(ActivePiece *piece, Shape *shape, int *hold_used) {
+    if (*hold_used) return;
+    Shape temp;
+
+    if (shape->shape == NULL) {
+        shape->shape = piece->type->shape;
+        shape->width = piece->type->width;
+        shape->height = piece->type->height;
+
+        *piece = spawn_piece(shapes, hold_used);
+        *hold_used = 1;
+    } else {
+        temp.shape = piece->type->shape;
+        temp.width = piece->type->width;
+        temp.height = piece->type->height;
+
+        piece->type->shape = shape->shape;
+        piece->type->width = shape->width;
+        piece->type->height = shape->height;
+        piece->x = BOARD_WIDTH / 2 - piece->type->width / 2;
+        piece->y = 0;
+
+        shape->shape = temp.shape;
+        shape->width = temp.width;
+        shape->height = temp.height;
+        *hold_used = 1;
+    }
+}
+
+void render_hold(Shape *shape) {
+    if (!shape || !shape->shape) return;
+    for (int i = 0; i < shape->height; i++) {
+        for (int j = 0; j < shape->width; j++) {
+            printf("\e[%d;%dH%i", 1+i, BOARD_WIDTH+2+j, shape->shape[i * shape->width + j]);
+        }
+    }
+}
+
 int main() {
     srand(time(NULL));
     configure_terminal();
@@ -369,10 +408,12 @@ int main() {
     height = w.ws_row;
 
     initialize_shapes(shapes);
+    int hold_used = 0;
 
     int board[BOARD_HEIGHT][BOARD_WIDTH] = {0};
-    ActivePiece piece = spawn_piece(shapes);
+    ActivePiece piece = spawn_piece(shapes, &hold_used);
     Shape hold_shape;
+    hold_shape.shape = NULL;
 
     signal(SIGINT, handle_sigint);
     double prev_time = get_time_seconds();
@@ -396,7 +437,7 @@ int main() {
                                     piece.y++;
                                 } else {
                                     update_state(board, &piece);
-                                    piece = spawn_piece(shapes);
+                                    piece = spawn_piece(shapes, &hold_used);
                                 }
                                 break;
                             case 'C': // Right
@@ -428,16 +469,16 @@ int main() {
                             piece.y++;
                         } else {
                             update_state(board, &piece);
-                            piece = spawn_piece(shapes);
+                            piece = spawn_piece(shapes, &hold_used);
                         }
                         break;
                     case ' ': // Full down
                         hard_drop(board, &piece);
                         update_state(board, &piece);
-                        piece = spawn_piece(shapes);
+                        piece = spawn_piece(shapes, &hold_used);
                         break;
                     case 'c': // Hold
-                        // hold(&piece, &hold_shape);
+                        hold(&piece, &hold_shape, &hold_used);
                         break;
                 }
             }
@@ -451,11 +492,12 @@ int main() {
             }
             else {
                 update_state(board, &piece);
-                piece = spawn_piece(shapes);
+                piece = spawn_piece(shapes, &hold_used);
             }
             check_clear(board);
         }
         debug(board, &piece);
+        render_hold(&hold_shape);
         render(board, &piece);
         fflush(stdout);
         usleep(100000);
