@@ -140,23 +140,28 @@ typedef struct {
     int x, y;
 } ActivePiece;
 
-ActivePiece spawn_piece(Shape *shapes[], int *hold_used) {
-    ActivePiece p;
-    p.src_type = shapes[rand() % NUM_SHAPES];
+void spawn_piece(ActivePiece *piece, Shape *shapes[], int *hold_used) {
+    Shape *src = shapes[rand() % NUM_SHAPES];
+    int size = src->width * src->height;
 
-    p.type = malloc(sizeof(Shape));
-    p.type->width = p.src_type->width;
-    p.type->height = p.src_type->height;
+    if (piece->type == NULL) {
+        piece->type = malloc(sizeof(Shape));
+        piece->type->shape = malloc(sizeof(int) * size);
+    } else if (piece->type->shape == NULL) {
+        piece->type->shape = malloc(sizeof(int) * size);
+    } else {
+        // if existing buffer too small, realloc
+        piece->type->shape = realloc(piece->type->shape, sizeof(int) * size);
+    }
 
-    int size = p.src_type->width * p.src_type->height;
-    p.type->shape = malloc(sizeof(int) * size);
-    memcpy(p.type->shape, p.src_type->shape, sizeof(int) * size);
+    memcpy(piece->type->shape, src->shape, sizeof(int) * size);
+    piece->type->width = src->width;
+    piece->type->height = src->height;
 
-    p.x = BOARD_WIDTH / 2 - p.type->width / 2;
-    p.y = 0;
-
+    piece->src_type = src;
+    piece->x = BOARD_WIDTH / 2 - src->width / 2;
+    piece->y = 0;
     *hold_used = 0;
-    return p;
 }
 
 void render(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
@@ -403,9 +408,7 @@ void hold(ActivePiece *piece, Shape *hold_shape, int *hold_used) {
         hold_shape->width = piece->src_type->width;
         hold_shape->height = piece->src_type->height;
 
-        free(piece->type->shape);
-        free(piece->type);
-        *piece = spawn_piece(shapes, hold_used);
+        spawn_piece(piece, shapes, hold_used);
     } else {
         swap_shape(piece, hold_shape);
     }
@@ -433,7 +436,8 @@ int main() {
     int hold_used = 0;
 
     int board[BOARD_HEIGHT][BOARD_WIDTH] = {0};
-    ActivePiece piece = spawn_piece(shapes, &hold_used);
+    ActivePiece piece = {0};
+    spawn_piece(&piece, shapes, &hold_used);
     g_piece = &piece;
     Shape hold_shape;
     hold_shape.shape = NULL;
@@ -460,9 +464,7 @@ int main() {
                                     piece.y++;
                                 } else {
                                     update_state(board, &piece);
-                                    free(piece.type->shape);
-                                    free(piece.type);
-                                    piece = spawn_piece(shapes, &hold_used);
+                                    spawn_piece(&piece, shapes, &hold_used);
                                 }
                                 break;
                             case 'C': // Right
@@ -494,17 +496,13 @@ int main() {
                             piece.y++;
                         } else {
                             update_state(board, &piece);
-                            free(piece.type->shape);
-                            free(piece.type);
-                            piece = spawn_piece(shapes, &hold_used);
+                            spawn_piece(&piece, shapes, &hold_used);
                         }
                         break;
                     case ' ': // Full down
                         hard_drop(board, &piece);
                         update_state(board, &piece);
-                        free(piece.type->shape);
-                        free(piece.type);
-                        piece = spawn_piece(shapes, &hold_used);
+                        spawn_piece(&piece, shapes, &hold_used);
                         break;
                     case 'c': // Hold
                         hold(&piece, &hold_shape, &hold_used);
@@ -521,9 +519,7 @@ int main() {
             }
             else {
                 update_state(board, &piece);
-                free(piece.type->shape);
-                free(piece.type);
-                piece = spawn_piece(shapes, &hold_used);
+                spawn_piece(&piece, shapes, &hold_used);
             }
             check_clear(board);
         }
