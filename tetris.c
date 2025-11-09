@@ -1,3 +1,4 @@
+#include <stdint.h>
 #include <sys/ioctl.h>
 #include <termios.h>
 #include <unistd.h>
@@ -51,39 +52,39 @@ double get_time_seconds() {
     return ts.tv_sec + ts.tv_nsec / 1e9;
 }
 
-int shape_s[2*3] = {
+uint8_t shape_s[2*3] = {
     0,1,1,
     1,1,0
 };
 
-int shape_z[2*3] = {
+uint8_t  shape_z[2*3] = {
     1,1,0,
     0,1,1
 };
 
-int shape_t[2*3] = {
+uint8_t shape_t[2*3] = {
     1,1,1,
     0,1,0
 };
 
-int shape_l[3*2] = {
+uint8_t shape_l[3*2] = {
     1,0,
     1,0,
     1,1,
 };
 
-int shape_j[3*2] = {
+uint8_t shape_j[3*2] = {
     0,1,
     0,1,
     1,1,
 };
 
-int shape_o[2*2] = {
+uint8_t shape_o[2*2] = {
     1,1,
     1,1
 };
 
-int shape_i[4*1] = {
+uint8_t shape_i[4*1] = {
     1,
     1,
     1,
@@ -94,7 +95,7 @@ int shape_i[4*1] = {
 
 typedef struct {
     int width, height;
-    int *shape;
+    uint8_t *shape;
 } Shape;
 
 void initialize_shapes(Shape *shapes[]) {
@@ -146,15 +147,15 @@ void spawn_piece(ActivePiece *piece, Shape *shapes[], int *hold_used) {
 
     if (piece->type == NULL) {
         piece->type = malloc(sizeof(Shape));
-        piece->type->shape = malloc(sizeof(int) * size);
+        piece->type->shape = malloc(sizeof(uint8_t) * size);
     } else if (piece->type->shape == NULL) {
-        piece->type->shape = malloc(sizeof(int) * size);
+        piece->type->shape = malloc(sizeof(uint8_t) * size);
     } else {
         // if existing buffer too small, realloc
-        piece->type->shape = realloc(piece->type->shape, sizeof(int) * size);
+        piece->type->shape = realloc(piece->type->shape, sizeof(uint8_t) * size);
     }
 
-    memcpy(piece->type->shape, src->shape, sizeof(int) * size);
+    memcpy(piece->type->shape, src->shape, sizeof(uint8_t) * size);
     piece->type->width = src->width;
     piece->type->height = src->height;
 
@@ -310,9 +311,9 @@ void debug(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
     Shape *shape = piece->type;
     for (int y = 0; y < shape->height; y++) {
         for (int x = 0; x < shape->width; x++) {
-            int val = shape->shape[y * shape->width + x] * 2;
+            uint8_t val = shape->shape[y * shape->width + x] * 2;
             if (val != 0) {
-                printf("\e[%d;%dH%i",
+                printf("\e[%d;%dH%u",
                        piece->y + y,
                        piece->x + x,
                        val);
@@ -350,7 +351,7 @@ void rotate_shape(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
     int new_w = shape->height;
     int new_h = shape->width;
 
-    int rotated[new_h * new_w];
+    uint8_t rotated[new_h * new_w];
 
     for (int y = 0; y < shape->height; y++) {
         for (int x = 0; x < shape->width; x++) {
@@ -389,8 +390,8 @@ void swap_shape(ActivePiece *piece, Shape *shape) {
     piece->type->width = shape->width;
     piece->type->height = shape->height;
     int size = shape->width * shape->height;
-    piece->type->shape = malloc(sizeof(int) * size);
-    memcpy(piece->type->shape, shape->shape, sizeof(int) * size);
+    piece->type->shape = malloc(sizeof(uint8_t) * size);
+    memcpy(piece->type->shape, shape->shape, sizeof(uint8_t) * size);
 
     piece->x = BOARD_WIDTH / 2 - piece->type->width / 2;
     piece->y = 0;
@@ -419,7 +420,7 @@ void render_hold(Shape *shape) {
     if (!shape || !shape->shape) return;
     for (int i = 0; i < shape->height; i++) {
         for (int j = 0; j < shape->width; j++) {
-            printf("\e[%d;%dH%i", 1+i, BOARD_WIDTH+2+j, shape->shape[i * shape->width + j]);
+            printf("\e[%d;%dH%u", 1+i, BOARD_WIDTH+2+j, shape->shape[i * shape->width + j]);
         }
     }
 }
