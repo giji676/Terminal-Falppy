@@ -6,7 +6,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include <math.h>
 
 #define BOARD_WIDTH 10
 #define BOARD_HEIGHT 20
@@ -136,15 +135,26 @@ void initialize_shapes(Shape *shapes[]) {
 }
 
 typedef struct {
+    Shape *src_type;
     Shape *type;
     int x, y;
 } ActivePiece;
 
 ActivePiece spawn_piece(Shape *shapes[], int *hold_used) {
     ActivePiece p;
-    p.type = shapes[rand() % NUM_SHAPES];
+    p.src_type = shapes[rand() % NUM_SHAPES];
+
+    p.type = malloc(sizeof(Shape));
+    p.type->width = p.src_type->width;
+    p.type->height = p.src_type->height;
+
+    int size = p.src_type->width * p.src_type->height;
+    p.type->shape = malloc(sizeof(int) * size);
+    memcpy(p.type->shape, p.src_type->shape, sizeof(int) * size);
+
     p.x = BOARD_WIDTH / 2 - p.type->width / 2;
     p.y = 0;
+
     *hold_used = 0;
     return p;
 }
@@ -205,6 +215,7 @@ void render(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
     }
 }
 
+ActivePiece *g_piece = NULL;
 Shape *shapes[NUM_SHAPES];
 
 void free_shapes() {
@@ -214,9 +225,14 @@ void free_shapes() {
 }
 
 void handle_sigint(int sig) {
+    if (g_piece && g_piece->type) {
+        free(g_piece->type->shape);
+        free(g_piece->type);
+        g_piece->type = NULL;
+    }
     free_shapes();
     reset_terminal();
-    _exit(0);
+    exit(0);
 }
 
 int check_fall(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
@@ -268,7 +284,6 @@ void try_move(int dir, int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece)
     }
     piece->x += dir;
 }
-
 
 void update_state(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
     Shape *shape = piece->type;
@@ -361,33 +376,40 @@ void rotate_shape(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
     shape->height = new_h;
 }
 
-void hold(ActivePiece *piece, Shape *shape, int *hold_used) {
+void swap_shape(ActivePiece *piece, Shape *shape) {
+    Shape *temp_src = piece->src_type;
+    piece->src_type = shape;
+
+    free(piece->type->shape);
+    piece->type->width = shape->width;
+    piece->type->height = shape->height;
+    int size = shape->width * shape->height;
+    piece->type->shape = malloc(sizeof(int) * size);
+    memcpy(piece->type->shape, shape->shape, sizeof(int) * size);
+
+    piece->x = BOARD_WIDTH / 2 - piece->type->width / 2;
+    piece->y = 0;
+
+    shape->shape = temp_src->shape;
+    shape->width = temp_src->width;
+    shape->height = temp_src->height;
+}
+
+void hold(ActivePiece *piece, Shape *hold_shape, int *hold_used) {
     if (*hold_used) return;
-    Shape temp;
 
-    if (shape->shape == NULL) {
-        shape->shape = piece->type->shape;
-        shape->width = piece->type->width;
-        shape->height = piece->type->height;
+    if (hold_shape->shape == NULL) {
+        hold_shape->shape = piece->src_type->shape;
+        hold_shape->width = piece->src_type->width;
+        hold_shape->height = piece->src_type->height;
 
+        free(piece->type->shape);
+        free(piece->type);
         *piece = spawn_piece(shapes, hold_used);
-        *hold_used = 1;
     } else {
-        temp.shape = piece->type->shape;
-        temp.width = piece->type->width;
-        temp.height = piece->type->height;
-
-        piece->type->shape = shape->shape;
-        piece->type->width = shape->width;
-        piece->type->height = shape->height;
-        piece->x = BOARD_WIDTH / 2 - piece->type->width / 2;
-        piece->y = 0;
-
-        shape->shape = temp.shape;
-        shape->width = temp.width;
-        shape->height = temp.height;
-        *hold_used = 1;
+        swap_shape(piece, hold_shape);
     }
+    *hold_used = 1;
 }
 
 void render_hold(Shape *shape) {
@@ -412,6 +434,7 @@ int main() {
 
     int board[BOARD_HEIGHT][BOARD_WIDTH] = {0};
     ActivePiece piece = spawn_piece(shapes, &hold_used);
+    g_piece = &piece;
     Shape hold_shape;
     hold_shape.shape = NULL;
 
@@ -437,6 +460,8 @@ int main() {
                                     piece.y++;
                                 } else {
                                     update_state(board, &piece);
+                                    free(piece.type->shape);
+                                    free(piece.type);
                                     piece = spawn_piece(shapes, &hold_used);
                                 }
                                 break;
@@ -469,12 +494,16 @@ int main() {
                             piece.y++;
                         } else {
                             update_state(board, &piece);
+                            free(piece.type->shape);
+                            free(piece.type);
                             piece = spawn_piece(shapes, &hold_used);
                         }
                         break;
                     case ' ': // Full down
                         hard_drop(board, &piece);
                         update_state(board, &piece);
+                        free(piece.type->shape);
+                        free(piece.type);
                         piece = spawn_piece(shapes, &hold_used);
                         break;
                     case 'c': // Hold
@@ -492,6 +521,8 @@ int main() {
             }
             else {
                 update_state(board, &piece);
+                free(piece.type->shape);
+                free(piece.type);
                 piece = spawn_piece(shapes, &hold_used);
             }
             check_clear(board);
@@ -500,6 +531,13 @@ int main() {
         render_hold(&hold_shape);
         render(board, &piece);
         fflush(stdout);
-        usleep(100000);
+        usleep(10000);
     }
+    if (piece.type) {
+        free(piece.type->shape);
+        free(piece.type);
+    }
+    reset_terminal();
+    free_shapes();
+    return 0;
 }
