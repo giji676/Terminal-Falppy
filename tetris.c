@@ -323,7 +323,8 @@ void debug(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
     printf("\e[%d;%dH(%i,%i)", BOARD_HEIGHT+1, 1, piece->y, piece->x);
 }
 
-void check_clear(int board[BOARD_HEIGHT][BOARD_WIDTH]) {
+int check_clear(int board[BOARD_HEIGHT][BOARD_WIDTH]) {
+    int cleared = 0;
     for (int i = 0; i < BOARD_HEIGHT; i++) {
         int full = 1;
         for (int j = 0; j < BOARD_WIDTH; j++) {
@@ -342,8 +343,10 @@ void check_clear(int board[BOARD_HEIGHT][BOARD_WIDTH]) {
                 board[0][j] = 0;
             }
             i--;
+            cleared++;
         }
     }
+    return cleared;
 }
 
 void rotate_shape(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
@@ -425,6 +428,32 @@ void render_hold(Shape *shape) {
     }
 }
 
+void render_score(int score, int lvl) {
+    printf("\e[%d;%dHLEVEL UP! %d", 6, width / 2 - 7, lvl);
+    printf("\e[%d;%dHSCORE: %d", 5, width/2 - 7, score);
+}
+
+int calculate_score(int lvl, int lines_cleared) {
+    switch (lines_cleared) {
+        case 1: return 40 * (lvl + 1);
+        case 2: return 100 * (lvl + 1);
+        case 3: return 300 * (lvl + 1);
+        case 4: return 1200 * (lvl + 1);
+        default: return 0;
+    }
+}
+
+void add_lines(int *lvl, int *total_lines, int *score, int cleared) {
+    *total_lines += cleared;
+    *score += calculate_score(*lvl, cleared);
+
+    int start_level = 0; // TEMP
+    int new_level = start_level + *total_lines / 10;
+    if (new_level > *lvl) {
+        *lvl = new_level;
+    }
+}
+
 int main() {
     srand(time(NULL));
     configure_terminal();
@@ -446,9 +475,11 @@ int main() {
     signal(SIGINT, handle_sigint);
     double prev_time = get_time_seconds();
 
+    int total_lines = 0;
+    int score = 0;
+    int level = 0;
     int running = 1;
     while (running) {
-        printf("\e[2J\e[H"); // clear terminal
         if (kbhit()) {
             char seq[3];
             read(STDIN_FILENO, &seq[0], 1);
@@ -511,6 +542,7 @@ int main() {
                 }
             }
         }
+        printf("\e[2J\e[H"); // clear terminal
         double now = get_time_seconds();
         if (now - prev_time > 0.3) {
             prev_time = now;
@@ -522,13 +554,14 @@ int main() {
                 update_state(board, &piece);
                 spawn_piece(&piece, shapes, &hold_used);
             }
-            check_clear(board);
+            add_lines(&level, &total_lines, &score, check_clear(board));
         }
         debug(board, &piece);
         render_hold(&hold_shape);
+        render_score(score, level);
         render(board, &piece);
         fflush(stdout);
-        usleep(10000);
+        usleep(100000);
     }
     if (piece.type) {
         free(piece.type->shape);
