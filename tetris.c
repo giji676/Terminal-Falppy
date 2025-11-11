@@ -548,74 +548,74 @@ int main() {
     double prev_time = get_time_seconds();
 
     while (gameState.running) {
-        if (kbhit()) {
-            char seq[3];
-            read(STDIN_FILENO, &seq[0], 1);
-            if (seq[0] == '\e') { // Escape sequence
-                // Check if the next two bytes exist
-                if (read(STDIN_FILENO, &seq[1], 1) > 0 && seq[1] == '[') {
-                    if (read(STDIN_FILENO, &seq[2], 1) > 0) {
-                        switch (seq[2]) {
-                            case 'A': // Up: rotate
-                                rotate_shape(&gameState);
-                                break;
-                            case 'B': // Down
-                                if (check_fall(&gameState)) {
-                                    gameState.activePiece.y++;
-                                } else {
-                                    update_state(&gameState);
-                                    spawn_piece(&gameState);
-                                }
-                                break;
-                            case 'C': // Right
-                                try_move(&gameState, 1);
-                                break;
-                            case 'D': // Left
-                                try_move(&gameState, -1);
-                                break;
+        if (!gameState.game_over) {
+            if (kbhit()) {
+                char seq[3];
+                read(STDIN_FILENO, &seq[0], 1);
+                if (seq[0] == '\e') { // Escape sequence
+                    // Check if the next two bytes exist
+                    if (read(STDIN_FILENO, &seq[1], 1) > 0 && seq[1] == '[') {
+                        if (read(STDIN_FILENO, &seq[2], 1) > 0) {
+                            switch (seq[2]) {
+                                case 'A': // Up: rotate
+                                    rotate_shape(&gameState);
+                                    break;
+                                case 'B': // Down
+                                    if (check_fall(&gameState)) {
+                                        gameState.activePiece.y++;
+                                    } else {
+                                        update_state(&gameState);
+                                        spawn_piece(&gameState);
+                                    }
+                                    break;
+                                case 'C': // Right
+                                    try_move(&gameState, 1);
+                                    break;
+                                case 'D': // Left
+                                    try_move(&gameState, -1);
+                                    break;
+                            }
                         }
                     }
-                }
-            } else {
-                switch (seq[0]) {
-                    case 'q':
-                        gameState.running = 0;
-                        break;
-                    case 'w':
-                    case 'k': // Rotate
-                        rotate_shape(&gameState);
-                        break;
-                    case 'l': // Right
-                        try_move(&gameState, 1);
-                        break;
-                    case 'h': // Left
-                        try_move(&gameState, -1);
-                        break;
-                    case 'j': // Down
-                        if (check_fall(&gameState)) {
-                            gameState.activePiece.y++;
-                        } else {
+                } else {
+                    switch (seq[0]) {
+                        case 'q':
+                            gameState.running = 0;
+                            break;
+                        case 'w':
+                        case 'k': // Rotate
+                            rotate_shape(&gameState);
+                            break;
+                        case 'l': // Right
+                            try_move(&gameState, 1);
+                            break;
+                        case 'h': // Left
+                            try_move(&gameState, -1);
+                            break;
+                        case 'j': // Down
+                            if (check_fall(&gameState)) {
+                                gameState.activePiece.y++;
+                            } else {
+                                update_state(&gameState);
+                                spawn_piece(&gameState);
+                            }
+                            break;
+                        case ' ': // Full down
+                            hard_drop(&gameState);
                             update_state(&gameState);
                             spawn_piece(&gameState);
-                        }
-                        break;
-                    case ' ': // Full down
-                        hard_drop(&gameState);
-                        update_state(&gameState);
-                        spawn_piece(&gameState);
-                        break;
-                    case 'c': // Hold
-                        hold(&gameState);
-                        break;
-                    case 'r': // Restart
-                        initialize_game_state(&gameState);
-                        break;
+                            break;
+                        case 'c': // Hold
+                            hold(&gameState);
+                            break;
+                        case 'r': // Restart
+                            initialize_game_state(&gameState);
+                            break;
+                    }
                 }
             }
-        }
-        printf("\e[2J\e[H"); // clear terminal
-        double now = get_time_seconds();
-        if (!gameState.game_over) {
+            printf("\e[2J\e[H"); // clear terminal
+            double now = get_time_seconds();
             if (now - prev_time > 0.3) {
                 prev_time = now;
 
@@ -629,6 +629,18 @@ int main() {
                 add_lines(&gameState, check_clear(&gameState));
             }
         } else {
+            if (kbhit()) {
+                char seq[3];
+                read(STDIN_FILENO, &seq[0], 1);
+                switch (seq[0]) {
+                    case 'q':
+                        gameState.running = 0;
+                        break;
+                    case 'r':
+                        initialize_game_state(&gameState);
+                        break;
+                }
+            }
             render_game_over(&gameState);
         }
         // debug(&gameState);
