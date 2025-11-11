@@ -11,46 +11,24 @@
 #define BOARD_WIDTH 10
 #define BOARD_HEIGHT 20
 #define BLOCK_MULT_X 2 
-#define BLOCK_MULT_Y 1
+#define NUM_SHAPES 7
 
 struct termios oldt, newt;
 int width, height;
 
-int kbhit() {
-    struct timeval tv = {0L, 0L};
-    fd_set fds;
-    FD_ZERO(&fds);
-    FD_SET(STDIN_FILENO, &fds);
-    return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
-}
+typedef struct {
+    int width, height;
+    uint8_t *shape;
+} Shape;
 
-void reset_terminal() {
-    printf("\e[m"); // reset color changes
-    printf("\e[?25h"); // show cursor
-    printf("\e[2J\e[H"); // clear terminal
-    printf("\e[4h"); // Enable insert mode
-    printf("\e[?7h");  // re-enable when done
-    fflush(stdout);
-    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
-}
+typedef struct {
+    Shape *src_type;
+    Shape *type;
+    int x, y;
+} ActivePiece;
 
-void configure_terminal() {
-    tcgetattr(STDIN_FILENO, &oldt);
-    newt = oldt;
-    newt.c_lflag &= ~(ICANON | ECHO);
-    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
-    printf("\e[?25l"); // hide cursor
-    printf("\e[2J\e[H"); // clear terminal
-    printf("\e[4l"); // Disable insert mode
-    printf("\e[?7l");  // disable auto-wrap
-    atexit(reset_terminal);
-}
-
-double get_time_seconds() {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec + ts.tv_nsec / 1e9;
-}
+ActivePiece *g_piece = NULL;
+Shape *shapes[NUM_SHAPES];
 
 uint8_t shape_s[2*3] = {
     0,1,1,
@@ -91,12 +69,41 @@ uint8_t shape_i[4*1] = {
     1
 };
 
-#define NUM_SHAPES 7
+int kbhit() {
+    struct timeval tv = {0L, 0L};
+    fd_set fds;
+    FD_ZERO(&fds);
+    FD_SET(STDIN_FILENO, &fds);
+    return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
+}
 
-typedef struct {
-    int width, height;
-    uint8_t *shape;
-} Shape;
+void reset_terminal() {
+    printf("\e[m"); // reset color changes
+    printf("\e[?25h"); // show cursor
+    printf("\e[2J\e[H"); // clear terminal
+    printf("\e[4h"); // Enable insert mode
+    printf("\e[?7h");  // re-enable when done
+    fflush(stdout);
+    tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
+}
+
+void configure_terminal() {
+    tcgetattr(STDIN_FILENO, &oldt);
+    newt = oldt;
+    newt.c_lflag &= ~(ICANON | ECHO);
+    tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    printf("\e[?25l"); // hide cursor
+    printf("\e[2J\e[H"); // clear terminal
+    printf("\e[4l"); // Disable insert mode
+    printf("\e[?7l");  // disable auto-wrap
+    atexit(reset_terminal);
+}
+
+double get_time_seconds() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec / 1e9;
+}
 
 void initialize_shapes(Shape *shapes[]) {
     shapes[0] = malloc(sizeof(Shape));
@@ -135,12 +142,6 @@ void initialize_shapes(Shape *shapes[]) {
     shapes[6]->height = 3;
 }
 
-typedef struct {
-    Shape *src_type;
-    Shape *type;
-    int x, y;
-} ActivePiece;
-
 void spawn_piece(ActivePiece *piece, Shape *shapes[], int *hold_used) {
     Shape *src = shapes[rand() % NUM_SHAPES];
     int size = src->width * src->height;
@@ -166,40 +167,40 @@ void spawn_piece(ActivePiece *piece, Shape *shapes[], int *hold_used) {
 }
 
 void render(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
-    int y_offset = (height / 2) - (BOARD_HEIGHT * BLOCK_MULT_Y * 0.5);
+    int y_offset = (height / 2) - (BOARD_HEIGHT * 0.5);
     int x_offset = (width / 2) - (BOARD_WIDTH * BLOCK_MULT_X * 0.5);
 
     for (int i = 0; i < BOARD_HEIGHT + 2; i++) {
         if (i <= BOARD_HEIGHT) {
             printf("\e[%d;%dH\e[32m%s",
-                   (i + 1) * BLOCK_MULT_Y + y_offset, 
+                   (i + 1) + y_offset, 
                    x_offset,
                    "<!");
             printf("\e[%d;%dH\e[32m%s",
-                   (i + 1) * BLOCK_MULT_Y + y_offset, 
+                   (i + 1) + y_offset, 
                    x_offset + BOARD_WIDTH * BLOCK_MULT_X + 2,
                    "!>");
         }
         for (int j = 0; j < BOARD_WIDTH; j++) {
             if (i == BOARD_HEIGHT) {
                 printf("\e[%d;%dH\e[32m%s",
-                       (i + 1) * BLOCK_MULT_Y + y_offset, 
+                       (i + 1) + y_offset, 
                        (j + 1) * BLOCK_MULT_X + x_offset, 
                        "==");
             } else if (i == BOARD_HEIGHT + 1) {
                 printf("\e[%d;%dH\e[32m%s",
-                       (i + 1) * BLOCK_MULT_Y + y_offset, 
+                       (i + 1) + y_offset, 
                        (j + 1) * BLOCK_MULT_X + x_offset, 
                        "\\/");
             } else {
                 if (board[i][j]) {
                     printf("\e[%d;%dH\e[32m%s",
-                           (i + 1) * BLOCK_MULT_Y + y_offset, 
+                           (i + 1) + y_offset, 
                            (j + 1) * BLOCK_MULT_X + x_offset, 
                            "[]");
                 } else {
                     printf("\e[%d;%dH\e[32m%s",
-                           (i + 1) * BLOCK_MULT_Y + y_offset, 
+                           (i + 1) + y_offset, 
                            (j + 1) * BLOCK_MULT_X + x_offset, 
                            " .");
                 }
@@ -213,16 +214,13 @@ void render(int board[BOARD_HEIGHT][BOARD_WIDTH], ActivePiece *piece) {
         for (int x = 0; x < shape->width; x++) {
             if (shape->shape[y * shape->width + x]) {
                 printf("\e[%d;%dH\e[32m%s",
-                       (piece->y + 1 + y) * BLOCK_MULT_Y + y_offset,
+                       (piece->y + 1 + y) + y_offset,
                        (piece->x + 1 + x) * BLOCK_MULT_X + x_offset,
                        "[]");
             }
         }
     }
 }
-
-ActivePiece *g_piece = NULL;
-Shape *shapes[NUM_SHAPES];
 
 void free_shapes() {
     for (int i = 0; i < NUM_SHAPES; i++) {
