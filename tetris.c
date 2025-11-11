@@ -39,6 +39,7 @@ typedef struct {
     int level;
     int running;
     int hold_used;
+    int game_over;
 } GameState;
 
 uint8_t shape_s[2*3] = {
@@ -175,6 +176,14 @@ void spawn_piece(GameState *state) {
     piece->src_type = src;
     piece->x = BOARD_WIDTH / 2 - src->width / 2;
     piece->y = 0;
+    for (int i = 0; i < piece->type->height; i++) {
+        for (int j = 0; j < piece->type->height; j++) {
+            if (piece->type->shape[i * piece->type->width + j] &&
+                state->board[piece->y + i][piece->x + j]) {
+                state->game_over = 1;
+            }
+        }
+    }
     state->hold_used = 0;
 }
 
@@ -457,8 +466,16 @@ void render_hold(GameState *state) {
 }
 
 void render_score(GameState *state) {
-    printf("\e[%d;%dHLEVEL UP! %d", 6, width / 2 - 7, state->level);
-    printf("\e[%d;%dHSCORE: %d", 5, width/2 - 7, state->score);
+    printf("\e[%d;%dHLEVEL UP! %d", 4, width / 2 - 7, state->level);
+    printf("\e[%d;%dHSCORE: %d", 3, width/2 - 7, state->score);
+}
+
+void render_game_over(GameState *state) {
+    printf("\e[%d;%dH%s",  6, width / 2 - 14/2 + 2, "==============");
+    printf("\e[%d;%dH%s",  7, width / 2 - 14/2 + 2, "| GAME OVER! |");
+    printf("\e[%d;%dH%s",  8, width / 2 - 14/2 + 2, "==============");
+    printf("\e[%d;%dH%s", 10, width / 2 - 18/2 + 2, "Press R to Restart");
+    printf("\e[%d;%dH%s", 11, width / 2 - 12/2 + 2, "or Q to Quit");
 }
 
 int calculate_score(int lvl, int lines_cleared) {
@@ -566,17 +583,21 @@ int main() {
         }
         printf("\e[2J\e[H"); // clear terminal
         double now = get_time_seconds();
-        if (now - prev_time > 0.3) {
-            prev_time = now;
+        if (!gameState.game_over) {
+            if (now - prev_time > 0.3) {
+                prev_time = now;
 
-            if (check_fall(&gameState)) {
-                gameState.activePiece.y++;
+                if (check_fall(&gameState)) {
+                    gameState.activePiece.y++;
+                }
+                else {
+                    update_state(&gameState);
+                    spawn_piece(&gameState);
+                }
+                add_lines(&gameState, check_clear(&gameState));
             }
-            else {
-                update_state(&gameState);
-                spawn_piece(&gameState);
-            }
-            add_lines(&gameState, check_clear(&gameState));
+        } else {
+            render_game_over(&gameState);
         }
         // debug(&gameState);
         render_hold(&gameState);
