@@ -52,8 +52,8 @@ uint8_t  shape_z[2*3] = {
 };
 
 uint8_t shape_t[2*3] = {
-    1,1,1,
-    0,1,0
+    0,1,0,
+    1,1,1
 };
 
 uint8_t shape_l[3*2] = {
@@ -440,11 +440,18 @@ void hold(GameState *state) {
 }
 
 void render_hold(GameState *state) {
+    int y_offset = (height / 2) - (BOARD_HEIGHT * 0.5) + 1;
+    int x_offset = (width / 2) - (BOARD_WIDTH * BLOCK_MULT_X * 0.5) - 10;
+
     Shape *shape = &state->hold_shape;
+
     if (!shape || !shape->shape) return;
     for (int i = 0; i < shape->height; i++) {
         for (int j = 0; j < shape->width; j++) {
-            printf("\e[%d;%dH%u", 1+i, BOARD_WIDTH+2+j, shape->shape[i * shape->width + j]);
+            printf("\e[%d;%dH%s",
+                   y_offset + i,
+                   x_offset + (j * BLOCK_MULT_X),
+                   shape->shape[i * shape->width + j] ? "[]" : "  ");
         }
     }
 }
@@ -571,7 +578,7 @@ int main() {
             }
             add_lines(&gameState, check_clear(&gameState));
         }
-        debug(&gameState);
+        // debug(&gameState);
         render_hold(&gameState);
         render_score(&gameState);
         render(&gameState);
