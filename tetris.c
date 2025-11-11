@@ -499,6 +499,36 @@ void add_lines(GameState *state, int cleared) {
     }
 }
 
+void initialize_game_state(GameState *state) {
+    // Clear board
+    memset(state->board, 0, sizeof(state->board));
+
+    // Reset hold shape
+    state->hold_shape = (Shape){0}; // shape=NULL, width=0, height=0
+    //
+    if (state->activePiece.type != NULL) {
+        free(state->activePiece.type->shape);
+        free(state->activePiece.type);
+    }
+
+    // Reset active piece
+    state->activePiece.type = NULL;
+    state->activePiece.src_type = NULL;
+    state->activePiece.x = 0;
+    state->activePiece.y = 0;
+
+    // Reset counters and flags
+    state->total_lines = 0;
+    state->score = 0;
+    state->level = 0;
+    state->running = 1;
+    state->hold_used = 0;
+    state->game_over = 0;
+
+    // Spawn first piece
+    spawn_piece(state);
+}
+
 int main() {
     srand(time(NULL));
     configure_terminal();
@@ -509,15 +539,14 @@ int main() {
 
     initialize_shapes(shapes);
 
-    GameState gameState = {0};
-
+    GameState gameState;
+    initialize_game_state(&gameState);
     spawn_piece(&gameState);
     g_piece = &gameState.activePiece;
 
     signal(SIGINT, handle_sigint);
     double prev_time = get_time_seconds();
 
-    gameState.running = 1;
     while (gameState.running) {
         if (kbhit()) {
             char seq[3];
@@ -577,6 +606,9 @@ int main() {
                         break;
                     case 'c': // Hold
                         hold(&gameState);
+                        break;
+                    case 'r': // Restart
+                        initialize_game_state(&gameState);
                         break;
                 }
             }
