@@ -13,6 +13,8 @@
 #define BLOCK_MULT_X 2 
 #define NUM_SHAPES 7
 
+#define ESC 27
+
 struct termios oldt, newt;
 int width, height;
 
@@ -38,6 +40,7 @@ typedef struct {
     int score;
     int level;
     int running;
+    int pause;
     int hold_used;
     int game_over;
 } GameState;
@@ -522,6 +525,7 @@ void initialize_game_state(GameState *state) {
     state->score = 0;
     state->level = 0;
     state->running = 1;
+    state->pause = 0;
     state->hold_used = 0;
     state->game_over = 0;
 
@@ -576,6 +580,9 @@ int main() {
                                     break;
                             }
                         }
+                    } else {
+                        gameState.pause = !gameState.pause;
+                        continue;
                     }
                 } else {
                     switch (seq[0]) {
@@ -611,9 +618,13 @@ int main() {
                         case 'r': // Restart
                             initialize_game_state(&gameState);
                             break;
+                        case 'p': // Puase
+                            gameState.pause = !gameState.pause;
+                            break;
                     }
                 }
             }
+            if (gameState.pause) continue;
             printf("\e[2J\e[H"); // clear terminal
             double now = get_time_seconds();
             if (now - prev_time > 0.3) {
