@@ -14,6 +14,7 @@
 #define NUM_SHAPES 7
 
 #define ESC 27
+#define FPS 60
 
 struct termios oldt, newt;
 int width, height;
@@ -43,6 +44,7 @@ typedef struct {
     int pause;
     int hold_used;
     int game_over;
+    int speed;
 } GameState;
 
 uint8_t shape_s[2*3] = {
@@ -92,6 +94,12 @@ int kbhit() {
     return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
 }
 
+double get_time_seconds() {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return ts.tv_sec + ts.tv_nsec / 1e9;
+}
+
 void reset_terminal() {
     printf("\e[m"); // reset color changes
     printf("\e[?25h"); // show cursor
@@ -114,11 +122,6 @@ void configure_terminal() {
     atexit(reset_terminal);
 }
 
-double get_time_seconds() {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return ts.tv_sec + ts.tv_nsec / 1e9;
-}
 
 void initialize_shapes(Shape *shapes[]) {
     shapes[0] = malloc(sizeof(Shape));
@@ -155,6 +158,26 @@ void initialize_shapes(Shape *shapes[]) {
     shapes[6]->shape = shape_l;
     shapes[6]->width = 2;
     shapes[6]->height = 3;
+}
+
+void update_speed(GameState *state) {
+    int lvl = state->level;
+
+    if (lvl <= 0) state->speed = 48;
+    else if (lvl == 1) state->speed = 43;
+    else if (lvl == 2) state->speed = 38;
+    else if (lvl == 3) state->speed = 33;
+    else if (lvl == 4) state->speed = 28;
+    else if (lvl == 5) state->speed = 23;
+    else if (lvl == 6) state->speed = 18;
+    else if (lvl == 7) state->speed = 13;
+    else if (lvl == 8) state->speed = 8;
+    else if (lvl == 9) state->speed = 6;
+    else if (lvl >= 10 && lvl <= 12) state->speed = 5;
+    else if (lvl >= 13 && lvl <= 15) state->speed = 4;
+    else if (lvl >= 16 && lvl <= 18) state->speed = 3;
+    else if (lvl >= 19 && lvl <= 28) state->speed = 2;
+    else state->speed = 1;
 }
 
 void spawn_piece(GameState *state) {
@@ -469,7 +492,7 @@ void render_hold(GameState *state) {
 }
 
 void render_score(GameState *state) {
-    printf("\e[%d;%dHLEVEL UP! %d", 4, width / 2 - 7, state->level);
+    printf("\e[%d;%dHLEVEL: %d", 4, width / 2 - 7, state->level);
     printf("\e[%d;%dHSCORE: %d", 3, width/2 - 7, state->score);
 }
 
@@ -499,6 +522,7 @@ void add_lines(GameState *state, int cleared) {
     int new_level = start_level + state->total_lines / 10;
     if (new_level > state->level) {
         state->level = new_level;
+        update_speed(state);
     }
 }
 
@@ -528,6 +552,7 @@ void initialize_game_state(GameState *state) {
     state->pause = 0;
     state->hold_used = 0;
     state->game_over = 0;
+    state->speed = 48; // DAS version initial speed for lvl 00
 
     // Spawn first piece
     spawn_piece(state);
@@ -550,8 +575,16 @@ int main() {
 
     signal(SIGINT, handle_sigint);
     double prev_time = get_time_seconds();
+    int frame_count = 0;
+    int prev_frame_count = 0;
 
     while (gameState.running) {
+        double now = get_time_seconds();
+        if (now - prev_time < 1.0/FPS) {
+            continue;
+        }
+        frame_count++;
+        prev_time = now;
         if (!gameState.game_over) {
             if (kbhit()) {
                 char seq[3];
@@ -626,10 +659,8 @@ int main() {
             }
             if (gameState.pause) continue;
             printf("\e[2J\e[H"); // clear terminal
-            double now = get_time_seconds();
-            if (now - prev_time > 0.3) {
-                prev_time = now;
-
+            if (frame_count - prev_frame_count > gameState.speed) {
+                prev_frame_count = frame_count;
                 if (check_fall(&gameState)) {
                     gameState.activePiece.y++;
                 }
@@ -659,7 +690,6 @@ int main() {
         render_score(&gameState);
         render(&gameState);
         fflush(stdout);
-        usleep(100000);
     }
     if (gameState.activePiece.type) {
         free(gameState.activePiece.type->shape);
