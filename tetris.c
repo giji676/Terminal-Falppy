@@ -122,7 +122,6 @@ void configure_terminal() {
     atexit(reset_terminal);
 }
 
-
 void initialize_shapes(Shape *shapes[]) {
     shapes[0] = malloc(sizeof(Shape));
     shapes[0]->shape = shape_s;
@@ -583,9 +582,28 @@ int main() {
         if (now - prev_time < 1.0/FPS) {
             continue;
         }
-        frame_count++;
-        prev_time = now;
         if (!gameState.game_over) {
+            if (gameState.pause) {
+                if (kbhit()) {
+                    char seq[1];
+                    read(STDIN_FILENO, &seq[0], 1);
+                    switch (seq[0]) {
+                        case 'q':
+                            gameState.running = 0;
+                            break;
+                        case 'r': // Restart
+                            initialize_game_state(&gameState);
+                            break;
+                        case '\e':
+                        case 'p': // Puase
+                            gameState.pause = !gameState.pause;
+                            break;
+                    }
+                }
+                continue;
+            }
+            frame_count++;
+            prev_time = now;
             if (kbhit()) {
                 char seq[3];
                 read(STDIN_FILENO, &seq[0], 1);
@@ -658,6 +676,7 @@ int main() {
                 }
             }
             if (gameState.pause) continue;
+
             printf("\e[2J\e[H"); // clear terminal
             if (frame_count - prev_frame_count > gameState.speed) {
                 prev_frame_count = frame_count;
