@@ -104,8 +104,9 @@ void reset_terminal() {
     printf("\e[m"); // reset color changes
     printf("\e[?25h"); // show cursor
     printf("\e[2J\e[H"); // clear terminal
-    printf("\e[4h"); // Enable insert mode
+    printf("\e[4h"); // enable insert mode
     printf("\e[?7h");  // re-enable when done
+    printf("\e[?1049l"); // leave alternate buffer
     fflush(stdout);
     tcsetattr(STDIN_FILENO, TCSANOW, &oldt);
 }
@@ -115,9 +116,10 @@ void configure_terminal() {
     newt = oldt;
     newt.c_lflag &= ~(ICANON | ECHO);
     tcsetattr(STDIN_FILENO, TCSANOW, &newt);
+    printf("\e[?1049h"); // switch to alternate buffer
     printf("\e[?25l"); // hide cursor
     printf("\e[2J\e[H"); // clear terminal
-    printf("\e[4l"); // Disable insert mode
+    printf("\e[4l"); // disable insert mode
     printf("\e[?7l");  // disable auto-wrap
     atexit(reset_terminal);
 }
@@ -202,7 +204,7 @@ void spawn_piece(GameState *state) {
     piece->x = BOARD_WIDTH / 2 - src->width / 2;
     piece->y = 0;
     for (int i = 0; i < piece->type->height; i++) {
-        for (int j = 0; j < piece->type->height; j++) {
+        for (int j = 0; j < piece->type->width; j++) {
             if (piece->type->shape[i * piece->type->width + j] &&
                 state->board[piece->y + i][piece->x + j]) {
                 state->game_over = 1;
@@ -292,11 +294,11 @@ int check_fall(GameState *state) {
 
     for (int y = 0; y < shape->height; y++) {
         for (int x = 0; x < shape->width; x++) {
-            if (piece->y + y == BOARD_HEIGHT - 1) {
-                return 0;
-            }
             if (!shape->shape[y * shape->width + x]) {
                 continue;
+            }
+            if (piece->y + y == BOARD_HEIGHT - 1) {
+                return 0;
             }
             if (state->board[piece->y + y + 1][piece->x + x]) {
                 return 0;
@@ -318,6 +320,9 @@ void try_move(GameState *state, int dir) {
 
     for (int y = 0; y < shape->height; y++) {
         for (int x = 0; x < shape->width; x++) {
+            if (!shape->shape[y * shape->width + x]) {
+                continue;
+            }
             if (dir == 1) {
                 if (piece->x + x == BOARD_WIDTH - 1) {
                     return;
@@ -326,9 +331,6 @@ void try_move(GameState *state, int dir) {
                 if (piece->x == 0) {
                     return;
                 }
-            }
-            if (!shape->shape[y * shape->width + x]) {
-                continue;
             }
             if (state->board[piece->y + y][piece->x + x + dir]) {
                 return;
@@ -634,7 +636,6 @@ int main() {
 
     GameState gameState;
     initialize_game_state(&gameState);
-    spawn_piece(&gameState);
     g_piece = &gameState.activePiece;
 
     signal(SIGINT, handle_sigint);
@@ -645,6 +646,7 @@ int main() {
     while (gameState.running) {
         double now = get_time_seconds();
         if (now - prev_time < 1.0/FPS) {
+            usleep(1000); // sleep 1 ms
             continue;
         }
         if (!gameState.game_over) {
