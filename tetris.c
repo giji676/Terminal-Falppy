@@ -372,32 +372,6 @@ void debug(GameState *state) {
     printf("\e[%d;%dH(%i,%i)", BOARD_HEIGHT+1, 1, piece->y, piece->x);
 }
 
-int check_clear(GameState *state) {
-    int cleared = 0;
-    for (int i = 0; i < BOARD_HEIGHT; i++) {
-        int full = 1;
-        for (int j = 0; j < BOARD_WIDTH; j++) {
-            if (!state->board[i][j]) {
-                full = 0;
-                break;
-            }
-        }
-        if (full) {
-            for (int k = i; k > 0; k--) {
-                for (int j = 0; j < BOARD_WIDTH; j++) {
-                    state->board[k][j] = state->board[k - 1][j];
-                }
-            }
-            for (int j = 0; j < BOARD_WIDTH; j++) {
-                state->board[0][j] = 0;
-            }
-            i--;
-            cleared++;
-        }
-    }
-    return cleared;
-}
-
 void rotate_shape(GameState *state) {
     ActivePiece *piece = &state->activePiece;
     Shape *shape = piece->type;
@@ -503,6 +477,97 @@ void render_game_over(GameState *state) {
     printf("\e[%d;%dH%s", 11, width / 2 - 12/2 + 2, "or Q to Quit");
 }
 
+int check_clear(GameState *state) {
+    int cleared = 0;
+    int full_rows[BOARD_HEIGHT];
+    int full_count = 0;
+
+    // detect all full rows
+    for (int i = 0; i < BOARD_HEIGHT; i++) {
+        int full = 1;
+        for (int j = 0; j < BOARD_WIDTH; j++) {
+            if (!state->board[i][j]) {
+                full = 0;
+                break;
+            }
+        }
+        if (full) {
+            full_rows[full_count++] = i;
+        }
+    }
+
+    if (full_count == 0)
+        return 0;
+
+    // animate clearing all full rows
+    for (int flash = 0; flash < 2; flash++) {
+
+        // hide rows
+        for (int i = 0; i < full_count; i++) {
+            int row = full_rows[i];
+            for (int j = 0; j < BOARD_WIDTH; j++) {
+                state->board[row][j] = 0;
+            }
+        }
+
+        printf("\e[2J\e[H");
+        render_hold(state);
+        render_score(state);
+        render(state);
+        fflush(stdout);
+
+        usleep(120000); // 120 ms flash
+
+        // restore rows
+        for (int i = 0; i < full_count; i++) {
+            int row = full_rows[i];
+            for (int j = 0; j < BOARD_WIDTH; j++) {
+                state->board[row][j] = 1; // or store original color if you have that
+            }
+        }
+
+        printf("\e[2J\e[H");
+        render_hold(state);
+        render_score(state);
+        render(state);
+        fflush(stdout);
+
+        usleep(120000);
+    }
+
+    // collapse
+    int write_row = BOARD_HEIGHT - 1;
+
+    for (int read_row = BOARD_HEIGHT - 1; read_row >= 0; read_row--) {
+        // skip cleared rows
+        int is_full = 0;
+        for (int k = 0; k < full_count; k++) {
+            if (full_rows[k] == read_row) {
+                is_full = 1;
+                break;
+            }
+        }
+        if (!is_full) {
+            // copy row downward
+            if (write_row != read_row) {
+                for (int j = 0; j < BOARD_WIDTH; j++) {
+                    state->board[write_row][j] = state->board[read_row][j];
+                }
+            }
+            write_row--;
+        }
+    }
+
+    // fill remaining top rows with zeros
+    for (int r = write_row; r >= 0; r--) {
+        for (int j = 0; j < BOARD_WIDTH; j++) {
+            state->board[r][j] = 0;
+        }
+    }
+
+    return full_count;
+}
+
 int calculate_score(int lvl, int lines_cleared) {
     switch (lines_cleared) {
         case 1: return 40 * (lvl + 1);
@@ -588,7 +653,7 @@ int main() {
                     char seq[1];
                     read(STDIN_FILENO, &seq[0], 1);
                     switch (seq[0]) {
-                        case 'q':
+                        case 'q': // Quit
                             gameState.running = 0;
                             break;
                         case 'r': // Restart
@@ -603,7 +668,7 @@ int main() {
                 continue;
             }
             frame_count++;
-            prev_time = now;
+            prev_time = get_time_seconds();
             if (kbhit()) {
                 char seq[3];
                 read(STDIN_FILENO, &seq[0], 1);
@@ -637,7 +702,7 @@ int main() {
                     }
                 } else {
                     switch (seq[0]) {
-                        case 'q':
+                        case 'q': // Quit
                             gameState.running = 0;
                             break;
                         case 'w':
