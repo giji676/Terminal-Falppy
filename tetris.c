@@ -36,6 +36,7 @@ Shape *shapes[NUM_SHAPES];
 typedef struct {
     int board[BOARD_HEIGHT][BOARD_WIDTH];
     Shape hold_shape;
+    Shape* next_shape;
     ActivePiece activePiece;
     int total_lines;
     int score;
@@ -182,7 +183,7 @@ void update_speed(GameState *state) {
 }
 
 void spawn_piece(GameState *state) {
-    Shape *src = shapes[rand() % NUM_SHAPES];
+    Shape *src = state->next_shape;
     int size = src->width * src->height;
     ActivePiece *piece = &state->activePiece;
 
@@ -211,6 +212,7 @@ void spawn_piece(GameState *state) {
             }
         }
     }
+    state->next_shape = shapes[rand() % NUM_SHAPES];
     state->hold_used = 0;
 }
 
@@ -455,6 +457,27 @@ void render_hold(GameState *state) {
 
     Shape *shape = &state->hold_shape;
 
+    printf("\e[%d;%dH%s", y_offset-2, x_offset-1, "HOLD");
+
+    if (!shape || !shape->shape) return;
+    for (int i = 0; i < shape->height; i++) {
+        for (int j = 0; j < shape->width; j++) {
+            printf("\e[%d;%dH%s",
+                   y_offset + i,
+                   x_offset + (j * BLOCK_MULT_X),
+                   shape->shape[i * shape->width + j] ? "[]" : "  ");
+        }
+    }
+}
+
+void render_next_piece(GameState *state) {
+    int y_offset = (height / 2) - (BOARD_HEIGHT * 0.5) + 1;
+    int x_offset = (width / 2) + (BOARD_WIDTH * BLOCK_MULT_X * 0.5) + 10;
+
+    Shape *shape = state->next_shape;
+
+    printf("\e[%d;%dH%s", y_offset-2, x_offset-1, "NEXT");
+
     if (!shape || !shape->shape) return;
     for (int i = 0; i < shape->height; i++) {
         for (int j = 0; j < shape->width; j++) {
@@ -514,6 +537,7 @@ int check_clear(GameState *state) {
 
         printf("\e[2J\e[H");
         render_hold(state);
+        render_next_piece(state);
         render_score(state);
         render(state);
         fflush(stdout);
@@ -530,6 +554,7 @@ int check_clear(GameState *state) {
 
         printf("\e[2J\e[H");
         render_hold(state);
+        render_next_piece(state);
         render_score(state);
         render(state);
         fflush(stdout);
@@ -610,6 +635,7 @@ void initialize_game_state(GameState *state) {
     state->activePiece.x = 0;
     state->activePiece.y = 0;
 
+
     // Reset counters and flags
     state->total_lines = 0;
     state->score = 0;
@@ -620,8 +646,25 @@ void initialize_game_state(GameState *state) {
     state->game_over = 0;
     state->speed = 48; // DAS version initial speed for lvl 00
 
+    state->next_shape = shapes[rand() % NUM_SHAPES];
     // Spawn first piece
     spawn_piece(state);
+}
+
+void spawn_next_piece(GameState *state) {
+    Shape *src = state->next_shape;
+    int size = src->width * src->height;
+    ActivePiece *piece = &state->activePiece;
+
+    if (piece->type == NULL) {
+        piece->type = malloc(sizeof(Shape));
+        piece->type->shape = malloc(sizeof(uint8_t) * size);
+    } else if (piece->type->shape == NULL) {
+        piece->type->shape = malloc(sizeof(uint8_t) * size);
+    } else {
+        // if existing buffer too small, realloc
+        piece->type->shape = realloc(piece->type->shape, sizeof(uint8_t) * size);
+    }
 }
 
 int main() {
@@ -773,6 +816,7 @@ int main() {
         }
         // debug(&gameState);
         render_hold(&gameState);
+        render_next_piece(&gameState);
         render_score(&gameState);
         render(&gameState);
         fflush(stdout);
