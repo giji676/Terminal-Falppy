@@ -37,7 +37,7 @@ typedef struct {
     int board[BOARD_HEIGHT][BOARD_WIDTH];
     Shape hold_shape;
     Shape* next_shape;
-    ActivePiece activePiece;
+    ActivePiece active_piece;
     int total_lines;
     int score;
     int level;
@@ -185,7 +185,7 @@ void update_speed(GameState *state) {
 void spawn_piece(GameState *state) {
     Shape *src = state->next_shape;
     int size = src->width * src->height;
-    ActivePiece *piece = &state->activePiece;
+    ActivePiece *piece = &state->active_piece;
 
     if (piece->type == NULL) {
         piece->type = malloc(sizeof(Shape));
@@ -258,7 +258,7 @@ void render(GameState *state) {
         }
     }
 
-    ActivePiece *piece = &state->activePiece;
+    ActivePiece *piece = &state->active_piece;
     Shape *shape = piece->type;
 
     for (int y = 0; y < shape->height; y++) {
@@ -291,7 +291,7 @@ void handle_sigint(int sig) {
 }
 
 int check_fall(GameState *state) {
-    ActivePiece *piece = &state->activePiece;
+    ActivePiece *piece = &state->active_piece;
     Shape *shape = piece->type;
 
     for (int y = 0; y < shape->height; y++) {
@@ -312,12 +312,12 @@ int check_fall(GameState *state) {
 
 void hard_drop(GameState *state) {
     while (check_fall(state)) {
-        state->activePiece.y++;
+        state->active_piece.y++;
     }
 }
 
 void try_move(GameState *state, int dir) {
-    ActivePiece *piece = &state->activePiece;
+    ActivePiece *piece = &state->active_piece;
     Shape *shape = piece->type;
 
     for (int y = 0; y < shape->height; y++) {
@@ -343,7 +343,7 @@ void try_move(GameState *state, int dir) {
 }
 
 void update_state(GameState *state) {
-    ActivePiece *piece = &state->activePiece;
+    ActivePiece *piece = &state->active_piece;
     Shape *shape = piece->type;
     for (int y = 0; y < shape->height; y++) {
         for (int x = 0; x < shape->width; x++) {
@@ -355,7 +355,7 @@ void update_state(GameState *state) {
 }
 
 void debug(GameState *state) {
-    ActivePiece *piece = &state->activePiece;
+    ActivePiece *piece = &state->active_piece;
     for (int i = 0; i < BOARD_HEIGHT; i++) {
         for (int j = 0; j < BOARD_WIDTH; j++) {
             printf("\e[%d;%dH%i", i, j, state->board[i][j]);
@@ -377,7 +377,7 @@ void debug(GameState *state) {
 }
 
 void rotate_shape(GameState *state) {
-    ActivePiece *piece = &state->activePiece;
+    ActivePiece *piece = &state->active_piece;
     Shape *shape = piece->type;
     int new_w = shape->height;
     int new_h = shape->width;
@@ -414,7 +414,7 @@ void rotate_shape(GameState *state) {
 }
 
 void swap_shape(GameState *state) {
-    ActivePiece *piece = &state->activePiece;
+    ActivePiece *piece = &state->active_piece;
     Shape *shape = &state->hold_shape;
     Shape *temp_src = piece->src_type;
     piece->src_type = shape;
@@ -435,7 +435,7 @@ void swap_shape(GameState *state) {
 }
 
 void hold(GameState *state) {
-    ActivePiece *piece = &state->activePiece;
+    ActivePiece *piece = &state->active_piece;
     Shape *hold_shape = &state->hold_shape;
     if (state->hold_used) return;
 
@@ -624,16 +624,16 @@ void initialize_game_state(GameState *state) {
     // Reset hold shape
     state->hold_shape = (Shape){0}; // shape=NULL, width=0, height=0
     //
-    if (state->activePiece.type != NULL) {
-        free(state->activePiece.type->shape);
-        free(state->activePiece.type);
+    if (state->active_piece.type != NULL) {
+        free(state->active_piece.type->shape);
+        free(state->active_piece.type);
     }
 
     // Reset active piece
-    state->activePiece.type = NULL;
-    state->activePiece.src_type = NULL;
-    state->activePiece.x = 0;
-    state->activePiece.y = 0;
+    state->active_piece.type = NULL;
+    state->active_piece.src_type = NULL;
+    state->active_piece.x = 0;
+    state->active_piece.y = 0;
 
 
     // Reset counters and flags
@@ -654,7 +654,7 @@ void initialize_game_state(GameState *state) {
 void spawn_next_piece(GameState *state) {
     Shape *src = state->next_shape;
     int size = src->width * src->height;
-    ActivePiece *piece = &state->activePiece;
+    ActivePiece *piece = &state->active_piece;
 
     if (piece->type == NULL) {
         piece->type = malloc(sizeof(Shape));
@@ -679,7 +679,7 @@ int main() {
 
     GameState gameState;
     initialize_game_state(&gameState);
-    g_piece = &gameState.activePiece;
+    g_piece = &gameState.active_piece;
 
     signal(SIGINT, handle_sigint);
     double prev_time = get_time_seconds();
@@ -727,7 +727,7 @@ int main() {
                                     break;
                                 case 'B': // Down
                                     if (check_fall(&gameState)) {
-                                        gameState.activePiece.y++;
+                                        gameState.active_piece.y++;
                                     } else {
                                         update_state(&gameState);
                                         spawn_piece(&gameState);
@@ -762,7 +762,7 @@ int main() {
                             break;
                         case 'j': // Down
                             if (check_fall(&gameState)) {
-                                gameState.activePiece.y++;
+                                gameState.active_piece.y++;
                             } else {
                                 update_state(&gameState);
                                 spawn_piece(&gameState);
@@ -791,7 +791,7 @@ int main() {
             if (frame_count - prev_frame_count > gameState.speed) {
                 prev_frame_count = frame_count;
                 if (check_fall(&gameState)) {
-                    gameState.activePiece.y++;
+                    gameState.active_piece.y++;
                 }
                 else {
                     update_state(&gameState);
@@ -821,9 +821,9 @@ int main() {
         render(&gameState);
         fflush(stdout);
     }
-    if (gameState.activePiece.type) {
-        free(gameState.activePiece.type->shape);
-        free(gameState.activePiece.type);
+    if (gameState.active_piece.type) {
+        free(gameState.active_piece.type->shape);
+        free(gameState.active_piece.type);
     }
     reset_terminal();
     free_shapes();
