@@ -53,7 +53,7 @@ uint8_t shape_s[2*3] = {
     1,1,0
 };
 
-uint8_t  shape_z[2*3] = {
+uint8_t shape_z[2*3] = {
     1,1,0,
     0,1,1
 };
@@ -63,16 +63,14 @@ uint8_t shape_t[2*3] = {
     1,1,1
 };
 
-uint8_t shape_l[3*2] = {
-    1,0,
-    1,0,
-    1,1,
+uint8_t shape_l[2*3] = {
+    0,0,1,
+    1,1,1
 };
 
-uint8_t shape_j[3*2] = {
-    0,1,
-    0,1,
-    1,1,
+uint8_t shape_j[2*3] = {
+    1,0,0,
+    1,1,1
 };
 
 uint8_t shape_o[2*2] = {
@@ -80,11 +78,8 @@ uint8_t shape_o[2*2] = {
     1,1
 };
 
-uint8_t shape_i[4*1] = {
-    1,
-    1,
-    1,
-    1
+uint8_t shape_i[1*4] = {
+    1,1,1,1
 };
 
 int kbhit() {
@@ -148,18 +143,18 @@ void initialize_shapes(Shape *shapes[]) {
 
     shapes[4] = malloc(sizeof(Shape));
     shapes[4]->shape = shape_i;
-    shapes[4]->width = 1;
-    shapes[4]->height = 4;
+    shapes[4]->width = 4;
+    shapes[4]->height = 1;
 
     shapes[5] = malloc(sizeof(Shape));
     shapes[5]->shape = shape_j;
-    shapes[5]->width = 2;
-    shapes[5]->height = 3;
+    shapes[5]->width = 3;
+    shapes[5]->height = 2;
 
     shapes[6] = malloc(sizeof(Shape));
     shapes[6]->shape = shape_l;
-    shapes[6]->width = 2;
-    shapes[6]->height = 3;
+    shapes[6]->width = 3;
+    shapes[6]->height = 2;
 }
 
 void update_speed(GameState *state) {
