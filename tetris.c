@@ -212,7 +212,7 @@ void spawn_piece(GameState *state) {
 }
 
 void render(GameState *state) {
-    int y_offset = (height / 2) - (BOARD_HEIGHT * 0.5);
+    int y_offset = (height / 2) - (BOARD_HEIGHT * 0.5) + 3;
     int x_offset = (width / 2) - (BOARD_WIDTH * BLOCK_MULT_X * 0.5);
 
     for (int i = 0; i < BOARD_HEIGHT + 2; i++) {
@@ -447,7 +447,7 @@ void hold(GameState *state) {
 }
 
 void render_hold(GameState *state) {
-    int y_offset = (height / 2) - (BOARD_HEIGHT * 0.5) + 1;
+    int y_offset = (height / 2) - (BOARD_HEIGHT * 0.5) + 1 + 3;
     int x_offset = (width / 2) - (BOARD_WIDTH * BLOCK_MULT_X * 0.5) - 10;
 
     Shape *shape = &state->hold_shape;
@@ -466,7 +466,7 @@ void render_hold(GameState *state) {
 }
 
 void render_next_piece(GameState *state) {
-    int y_offset = (height / 2) - (BOARD_HEIGHT * 0.5) + 1;
+    int y_offset = (height / 2) - (BOARD_HEIGHT * 0.5) + 1 + 3;
     int x_offset = (width / 2) + (BOARD_WIDTH * BLOCK_MULT_X * 0.5) + 10;
 
     Shape *shape = state->next_shape;
@@ -646,22 +646,6 @@ void initialize_game_state(GameState *state) {
     spawn_piece(state);
 }
 
-void spawn_next_piece(GameState *state) {
-    Shape *src = state->next_shape;
-    int size = src->width * src->height;
-    ActivePiece *piece = &state->active_piece;
-
-    if (piece->type == NULL) {
-        piece->type = malloc(sizeof(Shape));
-        piece->type->shape = malloc(sizeof(uint8_t) * size);
-    } else if (piece->type->shape == NULL) {
-        piece->type->shape = malloc(sizeof(uint8_t) * size);
-    } else {
-        // if existing buffer too small, realloc
-        piece->type->shape = realloc(piece->type->shape, sizeof(uint8_t) * size);
-    }
-}
-
 int main() {
     srand(time(NULL));
     configure_terminal();
@@ -794,6 +778,11 @@ int main() {
                 }
                 add_lines(&gameState, check_clear(&gameState));
             }
+            render_hold(&gameState);
+            render_next_piece(&gameState);
+            render_score(&gameState);
+            render(&gameState);
+            fflush(stdout);
         } else {
             if (kbhit()) {
                 char seq[3];
@@ -810,11 +799,6 @@ int main() {
             render_game_over(&gameState);
         }
         // debug(&gameState);
-        render_hold(&gameState);
-        render_next_piece(&gameState);
-        render_score(&gameState);
-        render(&gameState);
-        fflush(stdout);
     }
     if (gameState.active_piece.type) {
         free(gameState.active_piece.type->shape);

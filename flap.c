@@ -6,7 +6,6 @@
 #include <string.h>
 #include <stdio.h>
 #include <time.h>
-#include <math.h>
 
 #define MAX_PIPES 5 
 #define PIPES_WIDTH 10
@@ -43,13 +42,18 @@ int kbhit() {
     return select(STDIN_FILENO + 1, &fds, NULL, NULL, &tv) > 0;
 }
 
+int _round(double v) {
+    if (v - 0.5 <= (int)v) return (int)v;
+    return (int)v + 1;
+}
+
 void render(Bird *bird, Pipe pipes[]) {
     printf("\e[2J\e[H"); // clear terminal
 
     for (int i = 0; i < MAX_PIPES; i++) {
         for (int row = 0; row < pipes[i].t_h; row++) {
             for (int sx = 0; sx < PIPES_WIDTH; sx++) {
-                int col = (int)round(pipes[i].x) + sx;
+                int col = (int)_round(pipes[i].x) + sx;
                 if (col >= 0 && col < width && row >= 0 && row < height) {
                     printf("\e[%d;%dH\e[32m#", row + 1, col + 1);
                 }
@@ -58,7 +62,7 @@ void render(Bird *bird, Pipe pipes[]) {
 
         for (int row = pipes[i].b_y; row < height; row++) {
             for (int sx = 0; sx < PIPES_WIDTH; sx++) {
-                int col = (int)round(pipes[i].x) + sx;
+                int col = (int)_round(pipes[i].x) + sx;
                 if (col >= 0 && col < width && row >= 0 && row < height) {
                     printf("\e[%d;%dH#", row + 1, col + 1);
                 }
